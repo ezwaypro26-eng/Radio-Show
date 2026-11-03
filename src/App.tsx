@@ -1457,15 +1457,15 @@ export default function App() {
                         <ShieldAlert className="w-5 h-5 animate-pulse" />
                       </div>
                       <div className="space-y-3 flex-1 text-center md:text-left">
-                        <h4 className="font-bold text-red-200 text-xs md:text-sm tracking-wide uppercase">AI Studio Quota Limit Handled</h4>
+                        <h4 className="font-bold text-red-200 text-xs md:text-sm tracking-wide uppercase">Google Gemini API usage limit reached</h4>
                         <p className="text-white/75 text-xs leading-relaxed font-sans">
-                          The current Gemini API key has run out of request quota for generating complete shows. Generating background soundscapes, distinct host voices via Lyria & Speech models, and painting covers demands a persistent billing plan or a personal Gemini API key.
+                          Google has temporarily limited this project's Gemini API requests. The API key is already configured on Render. This can be a per-minute speech limit or a daily project limit, so upgrading or entering another key is not always necessary.
                         </p>
-                        <div className="text-[11px] text-white/60 bg-black/30 p-3 rounded-lg font-sans space-y-1">
-                          <div className="font-bold text-red-300">How to unlock unlimited generations:</div>
-                          <div>1. Go to the top-right <span className="font-semibold text-white/90">Settings &gt; Secrets</span> inside AI Studio.</div>
-                          <div>2. Locate <span className="font-mono text-io-blue font-bold">GEMINI_API_KEY</span>.</div>
-                          <div>3. Enter your own personal billed Google Gemini API Key.</div>
+                        <div className="text-[11px] text-white/60 bg-black/30 p-3 rounded-lg font-sans space-y-2">
+                          <div className="font-bold text-red-300">What to do</div>
+                          <p>Read the specific error in the generation log. Per-minute limits may clear soon; daily limits reset according to Google's project quota schedule.</p>
+                          <p>To see the project's current limits or enable paid usage, open <a href="https://aistudio.google.com/rate-limit" target="_blank" rel="noopener noreferrer" className="text-io-blue underline">Gemini API limits</a> or <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" className="text-io-blue underline">Google AI Studio</a>.</p>
+                          <p>For this deployed app, the key is configured under <a href="https://dashboard.render.com/web/srv-dbkkm26i0phs73ai5180" target="_blank" rel="noopener noreferrer" className="text-io-blue underline">Render Environment</a>, not AI Studio Settings &gt; Secrets. Never share the key publicly. Paid tiers have higher limits, not unlimited generation.</p>
                         </div>
                       </div>
                     </motion.div>
