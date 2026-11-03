@@ -1304,7 +1304,7 @@ export default function App() {
                </div>
                {startTime && (
                  <div className="font-mono text-[10px] text-white/45 uppercase tracking-widest font-medium">
-                   Elapsed: {formatElapsed(elapsedTime)} <span className="opacity-30">/</span> <span className="text-io-blue font-bold">Est: ~5 mins</span>
+                   Elapsed: {formatElapsed(elapsedTime)} <span className="opacity-30">/</span> <span className="text-io-blue font-bold">Audio generation in progress</span>
                  </div>
                )}
             </div>
@@ -1628,8 +1628,6 @@ export default function App() {
                           >
                             <option value="3" className="bg-neutral-900 text-white">3 Min</option>
                             <option value="5" className="bg-neutral-900 text-white">5 Min</option>
-                            <option value="10" className="bg-neutral-900 text-white">10 Min</option>
-                            <option value="15" className="bg-neutral-900 text-white">15 Min</option>
                           </select>
                         </div>
 
@@ -1681,7 +1679,7 @@ export default function App() {
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 text-[11px] text-white/30">
                   <div className="flex items-center gap-2 font-medium">
                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#fbbc04]/80 animate-pulse shadow-[0_0_6px_rgba(251,188,4,0.5)]" />
-                    <span>Each radio show generation takes <strong className="text-white/60 font-bold">~5 minutes</strong> to research and voice.</span>
+                    <span>Radio Show builds the script and voice in separate steps. Keep this tab open during generation.</span>
                   </div>
                   <div className="flex items-center gap-3.5">
                     <span>Please do not submit any sensitive or personal information.</span>
@@ -1718,7 +1716,7 @@ export default function App() {
                       onClick={() => {
                         if (quota && quota.remaining <= 0) return;
                         setPrompt(tmpl.prompt);
-                        setTargetDuration(tmpl.duration);
+                        setTargetDuration(String(Math.min(5, Number(tmpl.duration) || 3)));
                         document.querySelector('form')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                       }}
                       disabled={isGenerating || (quota && quota.remaining <= 0)}
