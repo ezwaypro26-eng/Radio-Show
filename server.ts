@@ -8,7 +8,6 @@ import util from 'util';
 import fs from "fs";
 import { Storage } from "@google-cloud/storage";
 import crypto from "crypto";
-import admin from "firebase-admin";
 
 const execAsync = util.promisify(exec);
 
@@ -461,50 +460,10 @@ async function startServer() {
     return new Date().toISOString().split('T')[0];
   }
 
-  let isFirebaseAdminInitialized = false;
-
-  function ensureFirebaseAdmin() {
-    if (!isFirebaseAdminInitialized) {
-      try {
-        admin.initializeApp();
-        isFirebaseAdminInitialized = true;
-        console.log("Firebase Admin initialized successfully (Application Default Credentials).");
-      } catch (err: any) {
-        console.warn("Could not retrieve Firebase Admin environment configuration from ADC:", err.message);
-        try {
-          const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
-          if (fs.existsSync(configPath)) {
-            const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-            admin.initializeApp({
-              projectId: config.projectId
-            });
-            isFirebaseAdminInitialized = true;
-            console.log("Initialized Firebase Admin with project ID from config layout.");
-          }
-        } catch (innerErr: any) {
-          console.error("Failed to initialize Firebase Admin with local config fallback:", innerErr.message);
-        }
-      }
-    }
-  }
-
-  async function getUserHash(req: express.Request): Promise<string | null> {
-    const authHeader = req.headers['authorization'];
-    if (authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.substring(7);
-      try {
-        ensureFirebaseAdmin();
-        const decodedToken = await admin.auth().verifyIdToken(token);
-        const uid = decodedToken.uid;
-        if (uid && typeof uid === 'string' && uid.trim() !== '') {
-          return crypto.createHash("sha256").update(uid.trim()).digest("hex");
-        }
-      } catch (err: any) {
-        console.error("Error verifying Firebase ID token:", err.message);
-      }
-    }
-    // Fallback during local development or unauthenticated preview testing
-    return "dev-user-hash";
+  // No Google sign-in: all anonymous visitors share one site-wide daily limit.
+  // This basic quota is not a substitute for private access control on a public deployment.
+  async function getUserHash(_req: express.Request): Promise<string> {
+    return "shared-radio-show-quota";
   }
 
   function getQuotaCount(userHash: string | null): number {
@@ -568,6 +527,10 @@ async function startServer() {
     cleanUpOldGenerations();
 
     const { topic, duration = "15", mood = "Informative", generationId } = req.body;
+
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(503).json({ error: "Show generation is not configured: GEMINI_API_KEY is missing on the server." });
+    }
 
     if (process.env.NODE_ENV !== "production") {
       console.log(`[generate-show] Running in dev mode, skipping daily quota tracking.`);
