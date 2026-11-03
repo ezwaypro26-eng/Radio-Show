@@ -601,11 +601,13 @@ async function startServer() {
 
     req.on('aborted', () => {
       if (!isFinished) {
-        console.log(`[generate-show] Client aborted request. Agent will continue running in background unless explicitly cancelled.`);
+        console.log("[generate-show] Request aborted; cancelling audio generation.");
+        abortController.abort();
       }
       clearInterval(heartbeatInterval);
     });
-    req.on('close', () => {
+    res.on('close', () => {
+      if (!isFinished) abortController.abort();
       clearInterval(heartbeatInterval);
     });
 
