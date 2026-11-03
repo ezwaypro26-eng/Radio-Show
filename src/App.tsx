@@ -976,6 +976,7 @@ export default function App() {
     setCurrentStage('Initializing...');
 
     let generatedShow: typeof MOCK_SHOW | null = null;
+    let generationFailed = false;
 
     abortControllerRef.current = new AbortController();
     const generationId = Math.random().toString(36).substring(2, 15);
@@ -1023,7 +1024,8 @@ export default function App() {
 
       if (!response.ok) {
         console.error("[Client] Non-2xx response. Throwing error.");
-        throw new Error(`API Error: ${response.status}`);
+        const errorInfo = await response.json().catch(() => ({}));
+        throw new Error(errorInfo.error || `API Error: ${response.status}`);
       }
 
       const reader = response.body?.getReader();
@@ -1066,6 +1068,7 @@ export default function App() {
             const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
 
             if (event.type === "info" || event.type === "error") {
+               if (event.type === "error") generationFailed = true;
                if (event.message?.includes('Downloading')) setCurrentStage('Extracting final files...');
                if (event.type === "error" && (
                  event.message?.toLowerCase().includes("quota") || 
@@ -1161,7 +1164,7 @@ export default function App() {
       // Add a slight delay for dramatic effect
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      if (generatedShow) {
+      if (generatedShow && !generationFailed) {
         const userShow = { ...generatedShow, isUserGenerated: true };
         
         // Persist to user's IndexedDB database
@@ -1176,6 +1179,13 @@ export default function App() {
         setGenerationComplete(true);
         setPrompt('');
         refreshQuota();
+      } else if (!generationFailed) {
+        setGenerationLogs(prev => [...prev, {
+          id: Math.random().toString(),
+          timestamp: new Date().toISOString().split('T')[1].split('.')[0],
+          type: 'error',
+          content: 'The episode stopped before the final audio was ready. No MP3 was generated. Try a shorter prompt or a 3-minute show.'
+        }]);
       }
 
     } catch (error: any) {
