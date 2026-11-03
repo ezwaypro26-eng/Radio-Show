@@ -21,7 +21,7 @@ import random
 # Suppress experimental warnings from SDK
 warnings.filterwarnings("ignore", message="Interactions usage is experimental")
 
-BASE_PROMPT = "A professional podcast cover image for a show titled '{title}' on the 'AI Talk Radio' station. The design features the text '{title}' in a bold, stylish font"
+BASE_PROMPT = "A professional podcast cover image for a show titled '{title}' on 'THE OG BEATZ RADIO SHOW'. The design features the text '{title}' in a bold, stylish font"
 
 PROMPT_STYLES = [
     " centered on the cover. The background is a vibrant purple with a textured water ripple effect that covers the entire frame, creating a dynamic and clean aesthetic.",
@@ -126,7 +126,7 @@ def main():
         with open(args.metadata, "r") as f:
             metadata = json.load(f)
 
-        title = metadata.get("show_title", "AI Talk Radio")
+        title = metadata.get("show_title", "THE OG BEATZ RADIO SHOW")
         summary = metadata.get("two_sentence_summary", "")
 
         print(f"Selecting prompt template for title: '{title}'")
