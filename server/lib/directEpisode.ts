@@ -130,31 +130,22 @@ function decodeAudio(buffer: Buffer): AudioSegment {
 
 async function voiceChunk(script: string, signal: AbortSignal): Promise<AudioSegment> {
   let lastError: Error | null = null;
-  const options = [
-    { model: process.env.GEMINI_TTS_MODEL || "gemini-3.8-flash-lite-tts", modern: true },
-    { model: "gemini-3.1-flash-tts-preview", modern: false },
-    { model: "gemini-2.5-flash-preview-tts", modern: false }
-  ];
+  const models = [process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts", "gemini-3.1-flash-tts-preview"];
   const tried = new Set<string>();
-  for (const option of options) {
-    if (tried.has(option.model)) continue;
-    tried.add(option.model);
+  for (const model of models) {
+    if (tried.has(model)) continue;
+    tried.add(model);
     try {
-      const speechConfig = option.modern
-        ? { voiceConfig: { voice: "Fenrir" } }
-        : { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Fenrir" } } };
-      const result = await askGemini(option.model, {
+      const result = await askGemini(model, {
         contents: [{
           role: "user",
           parts: [{
-            text: option.modern
-              ? script
-              : "Read this spoken radio segment as OG BEATZ, a confident and warm hip-hop producer speaking naturally in American English. Say only these words: " + script
+            text: "Read the following exact words as OG BEATZ, the single host of a hip-hop radio show, speaking in a warm, authentic, conversational American voice. Do not add anything: " + script
           }]
         }],
         generationConfig: {
           responseModalities: ["AUDIO"],
-          speechConfig
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Fenrir" } } }
         }
       }, signal, 90000);
       const inline = (result?.candidates?.[0]?.content?.parts || [])
