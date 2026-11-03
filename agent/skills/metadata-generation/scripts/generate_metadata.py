@@ -48,9 +48,9 @@ def make_fallback_metadata(transcript_text, duration_str, today_date, output_pat
             current_seconds += 15  # Increment estimate roughly for turns
 
     fallback_data = {
-        "show_title": "AI Talk Radio Broadcast",
+        "show_title": "THE OG BEATZ RADIO SHOW",
         "show_duration": duration_str,
-        "two_sentence_summary": "In this automated broadcast, host Paul and guest callers debate current events, technological boundaries, and contrarian perspectives.",
+        "two_sentence_summary": "In this automated broadcast, host OG BEATZ explores hip-hop culture, music production and creative tools with occasional guests or callers.",
         "date_of_generation": today_date,
         "timecoded_transcript": turns
     }
@@ -88,7 +88,7 @@ def main():
         print(f"ERROR: Audio file not found in {os.path.dirname(audio_mp3)}")
         return
 
-    print("=== AI Talk Radio: Metadata Generation ===\n")
+    print("=== OG BEATZ Radio Show: Metadata Generation ===\n")
     print(f"Transcript: {transcript_path}")
     print(f"Audio: {audio_path}")
 
@@ -121,7 +121,7 @@ def main():
     prompt = f"""You are an AI assistant analyzing a radio show production.
 You are provided with the audio file of the show and the text transcript.
 
-Based on the audio and transcript, generate a JSON object containing the following information:
+OG BEATZ is the only host; other speakers are guests/callers. Keep the show identity THE OG BEATZ RADIO SHOW. Based on the audio and transcript, generate a JSON object containing the following information:
 1. `show_title`: A catchy title for this show episode (maximum of 5 words).
 2. `show_duration`: The duration of the show (use "{duration_str}" if accurate, or estimate from audio).
 3. `two_sentence_summary`: A two-sentence summary of the show's content.
