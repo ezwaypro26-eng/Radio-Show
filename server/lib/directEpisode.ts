@@ -133,48 +133,87 @@ function decodeAudio(buffer: Buffer): AudioSegment {
   return { pcm: audio, rate: sampleRate, channels, sampleWidth: width };
 }
 
-async function voiceChunk(script: string, signal: AbortSignal): Promise<AudioSegment> {
-  let lastError: Error | null = null;
-  // The Gemini 3.8 TTS models use the Interactions API and a speech_config voice.
-  // Do not fall back to 2.5 TTS: access to legacy 2.5 models is restricted for new users.
-  const configured = process.env.GEMINI_TTS_MODEL?.trim();
-  const preferred = configured && /^gemini-3\.8-flash(-lite)?-tts$/.test(configured)
-    ? configured : "gemini-3.8-flash-lite-tts";
-  const models = [...new Set([preferred, "gemini-3.8-flash-tts"])];
-  for (const model of models) {
-    try {
-      const result = await askGemini(model, {
-        input: [{
-          type: "user_input",
-          content: [{
-            type: "text",
-            text: script,
-            annotations: [{
-              type: "speech_metadata",
-              style: "Warm, charismatic, conversational American hip-hop radio host; natural pacing, confident but never exaggerated."
+// Speech calls share one paced queue per server instance to avoid hitting Google's
+// three-requests-per-minute free-tier limit for Gemini Flash-Lite TTS.
+let nextSpeechCallAt = 0;
+let speechQueue: Promise<void> = Promise.resolve();
+
+async function delayWithAbort(ms: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) throw new Error("Generation was cancelled.");
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => { signal.removeEventListener("abort", cancel); resolve(); }, ms);
+    const cancel = () => { clearTimeout(timer); reject(new Error("Generation was cancelled.")); };
+    signal.addEventListener("abort", cancel, { once: true });
+  });
+}
+
+async function pacedSpeechCall(model: string, script: string, signal: AbortSignal): Promise<any> {
+  let release!: () => void;
+  const turn = speechQueue;
+  speechQueue = new Promise<void>(resolve => { release = resolve; });
+  await turn;
+  try {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const delay = Math.max(0, nextSpeechCallAt - Date.now());
+      if (delay) await delayWithAbort(delay, signal);
+      if (signal.aborted) throw new Error("Generation was cancelled.");
+      nextSpeechCallAt = Date.now() + 22000;
+      try {
+        return await askGemini(model, {
+          input: [{
+            type: "user_input",
+            content: [{
+              type: "text",
+              text: script,
+              annotations: [{
+                type: "speech_metadata",
+                style: "Warm, charismatic, conversational American hip-hop radio host; natural pacing, confident but never exaggerated."
+              }]
             }]
-          }]
-        }],
-        response_format: { type: "audio", mime_type: "audio/l16", sample_rate: 24000 },
-        generation_config: { speech_config: [{ voice: "Fenrir" }] }
-      }, signal, 90000, "interactions");
-      const audioBlock = (result?.steps || [])
-        .flatMap((step: any) => Array.isArray(step?.content) ? step.content : [])
-        .find((part: any) => part?.type === "audio" && typeof part?.data === "string");
-      const encoded = audioBlock?.data || result?.output_audio?.data;
-      if (!encoded) throw new Error("The speech model returned no audio.");
-      const audio = decodeAudio(Buffer.from(encoded, "base64"));
-      if (audio.sampleWidth !== 2 || audio.channels !== 1 || audio.rate !== 24000) {
-        throw new Error("The voice model returned an unsupported audio format.");
+          }],
+          response_format: { type: "audio", mime_type: "audio/l16", sample_rate: 24000 },
+          generation_config: { speech_config: [{ voice: "Fenrir" }] }
+        }, signal, 90000, "interactions");
+      } catch (err: any) {
+        const message = String(err?.message || err);
+        const quotaError = /\b429\b|RESOURCE_EXHAUSTED|rate limit|quota/i.test(message);
+        const daily = /per day|daily|retry in \d+h/i.test(message);
+        if (quotaError && !daily && attempt < 2) {
+          const seconds = Number(message.match(/retry in (\d+)s/i)?.[1] || 0);
+          nextSpeechCallAt = Math.max(nextSpeechCallAt, Date.now() + Math.max(25000, (seconds + 3) * 1000));
+          continue;
+        }
+        if (quotaError) {
+          throw new Error(daily
+            ? "Google's daily Gemini speech-generation quota is exhausted for this project. Check the project's billing tier and limits in Google AI Studio; a new key in the same project will not reset the quota."
+            : "Google is rate-limiting Gemini speech generation on this project. Please try again when the per-minute limit resets, or enable a paid usage tier. " + message.slice(0, 220));
+        }
+        throw err;
       }
-      return audio;
-    } catch (error: any) {
-      lastError = error;
-      if (signal.aborted) throw error;
-      console.warn("[direct-radio] TTS attempt failed:", String(error?.message || error).slice(0, 300));
     }
+    throw new Error("Google's speech service could not complete the audio.");
+  } finally {
+    release();
   }
-  throw lastError || new Error("Google could not generate the speech.");
+}
+
+async function voiceChunk(script: string, signal: AbortSignal): Promise<AudioSegment> {
+  // One TTS model only: switching to another model after a 429 can trigger
+  // a separate daily limit and unnecessarily consume more API requests.
+  const configured = process.env.GEMINI_TTS_MODEL?.trim();
+  const model = configured && /^gemini-3\.8-flash(-lite)?-tts$/.test(configured)
+    ? configured : "gemini-3.8-flash-lite-tts";
+  const result = await pacedSpeechCall(model, script, signal);
+  const audioBlock = (result?.steps || [])
+    .flatMap((step: any) => Array.isArray(step?.content) ? step.content : [])
+    .find((part: any) => part?.type === "audio" && typeof part?.data === "string");
+  const encoded = audioBlock?.data || result?.output_audio?.data;
+  if (!encoded) throw new Error("Google's speech request returned no audio.");
+  const audio = decodeAudio(Buffer.from(encoded, "base64"));
+  if (audio.sampleWidth !== 2 || audio.channels !== 1 || audio.rate !== 24000) {
+    throw new Error("The voice model returned an unsupported audio format.");
+  }
+  return audio;
 }
 
 function waveFromPcm(pcm: Buffer): Buffer {
