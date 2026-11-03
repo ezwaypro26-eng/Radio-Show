@@ -547,7 +547,7 @@ async function startServer() {
       }
     }
 
-    const prompt = `Generate a radio station about: ${topic}. Target duration: ${duration} minutes. Set the tone and style of the show to: ${mood}. Follow the workflow in AGENTS.md to research, write, generate speech and music, mix the audio, and generate the metadata.`;
+    const prompt = `Create one complete ${duration}-minute episode of THE OG BEATZ RADIO SHOW. OG BEATZ is the only host. Topic: ${topic}. Tone: ${mood}. Follow AGENTS.md and use the existing production scripts without editing or testing them. Deliver a playable MP3 and show_notes.json. If a required step fails, report the error instead of claiming completion.`;
 
     res.writeHead(200, {
       "Content-Type": "text/event-stream",
@@ -636,16 +636,22 @@ async function startServer() {
       console.log(`[generate-show] Response remains ok. Constructing SSE stream reader...`);
       let accumulatedText = "";
       let envId: string | undefined;
+      let interactionCompleted = false;
+      let deliveredAudio = false;
 
       let eventCount = 0;
       for await (const event of streamInteraction(response)) {
         eventCount++;
         console.log(`[generate-show] SSE yields streaming event #${eventCount}: type="${event.type}"`);
+        if (event.type === "error") {
+          throw new Error(event.message || "Google stopped generating the episode.");
+        }
         if (event.type === "done") {
           console.log(`[generate-show] Received explicit "done" marker from interaction stream.`);
           break;
         }
         if (event.type === "complete") {
+          interactionCompleted = true;
           envId = (event.interaction?.environment as any)?.env_id || event.interaction?.environment_id;
           console.log(`[generate-show] Interaction completed. Extracted environment ID: "${envId}"`);
           const usage = event.interaction?.usage as any;
@@ -700,16 +706,8 @@ async function startServer() {
         }
       }
 
-      // Check for JSON blocks fallback after full stream completion to avoid overwhelming stream buffers
-      if (accumulatedText) {
-        try {
-          const blocks = extractJsonBlocks(accumulatedText);
-          if (blocks.length > 0) {
-            sendEvent({ type: "show_data", data: blocks[blocks.length - 1] });
-          }
-        } catch (e) {
-          console.error("Failed to parse JSON blocks fallback from accumulated text:", e);
-        }
+      if (!interactionCompleted || !envId) {
+        throw new Error("The AI agent stopped before producing a finished audio episode. No MP3 was delivered.");
       }
 
       if (envId) {
@@ -743,30 +741,33 @@ async function startServer() {
               }
             }
 
-            if (showNotes) {
-              if (audioBase64) {
-                showNotes.audioUrl = `data:audio/mp3;base64,${audioBase64}`;
-              }
-              if (coverBase64) {
-                showNotes.coverImage = `data:image/png;base64,${coverBase64}`;
-              }
-              showNotes.isBase64Encoded = true;
-              sendEvent({ type: "show_data", data: showNotes });
-            } else {
-              console.error("show_notes.json was not found in the extracted tar archive");
-              sendEvent({ type: "error", message: "Successfully extracted the archive but show_notes.json of the show was missing." });
+            if (!showNotes) {
+              throw new Error("Show notes were missing from Google's generated files.");
             }
+            if (!audioBase64) {
+              throw new Error("Google ended the job without a playable MP3. The episode was not completed.");
+            }
+            showNotes.audioUrl = `data:audio/mp3;base64,${audioBase64}`;
+            if (coverBase64) {
+              showNotes.coverImage = `data:image/png;base64,${coverBase64}`;
+            }
+            showNotes.isBase64Encoded = true;
+            sendEvent({ type: "show_data", data: showNotes });
+            deliveredAudio = true;
           } else {
             const errBody = await res.text();
             console.error("Failed to download snapshot:", errBody);
-            sendEvent({ type: "error", message: `Failed to retrieve files from simulation: ${errBody}` });
+            throw new Error(`Failed to retrieve final audio from Google: ${errBody.slice(0, 300)}`);
           }
         } catch (err: any) {
           console.error("Error processing snapshot in memory:", err);
-          sendEvent({ type: "error", message: `Error extracted show files: ${err.message}` });
+          throw new Error(`Error extracting final show files: ${err.message}`);
         }
       }
 
+      if (!deliveredAudio) {
+        throw new Error("Generation ended without a playable MP3. Please try again with a shorter prompt.");
+      }
       isFinished = true;
       sendEvent({ type: "status", status: "completed" });
     } catch (err: any) {
