@@ -169,6 +169,14 @@ export default function App() {
   // --- RATE LIMITER & QUOTA STATES ---
   const DAILY_LIMIT = 3;
 
+  const [quota, setQuota] = useState<{
+    allowed: boolean;
+    limit: number;
+    remaining: number;
+    used: number;
+  } | null>(null);
+
+
   const refreshQuota = async () => {
     try {
       const res = await fetch("/api/quota");
