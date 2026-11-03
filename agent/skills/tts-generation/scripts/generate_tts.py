@@ -41,7 +41,7 @@ warnings.filterwarnings("ignore", message="Interactions usage is experimental")
 
 # Voice mapping — each speaker gets a unique Gemini TTS voice
 VOICE_MAP = {
-    "Paul": "Puck",     # Host — studio quality male voice
+    "OG BEATZ": "Fenrir",     # Host — studio quality male voice
 }
 
 FEMALE_VOICES = ["Kore"]
@@ -51,10 +51,10 @@ MAX_RETRIES = 3
 MAX_WORKERS = 8
 
 PROFILES = {
-    "Paul": {
-        "profile": "# AUDIO PROFILE: Paul\n## Role: Community Radio Host\n## Persona: Professional, warm, and engaging British radio host.",
-        "scene": "## THE SCENE: The London Studio\nA professional studio in London. Paul is sitting comfortably, speaking into a high-quality microphone with a warm and authoritative tone.",
-        "notes": "### DIRECTOR'S NOTES\nStyle: Professional, warm, engaging, and measured.\nPacing: Steady but dynamic.\nAccent: British English accent as heard in London, England.",
+    "OG BEATZ": {
+        "profile": "# AUDIO PROFILE: OG BEATZ\n## Role: Community Radio Host\n## Persona: Confident, warm, authentic hip-hop producer and solo radio host.",
+        "scene": "## THE SCENE: OG BEATZ Radio Studio\nOG BEATZ is the sole host, speaking naturally into a broadcast microphone with warm, confident delivery.",
+        "notes": "### DIRECTOR'S NOTES\nStyle: Professional, warm, engaging, and measured.\nPacing: Steady but dynamic.\nAccent: American English.",
     },
     "default_caller": {
         "profile": "# AUDIO PROFILE: Caller\n## Role: Tech-savvy individual calling in to a radio show.\n## Persona: Nerdy, conversational, not a professional broadcaster.",
@@ -183,8 +183,8 @@ def process_turn(client, turn_index, speaker, text, voice, accent, segments_dir,
         print(f"    [{turn_index}] ✗ All {MAX_RETRIES} attempts failed, skipping")
         return (turn_index, None)
 
-    # Apply telephone filter for callers (not Paul)
-    if speaker != "Paul":
+    # Apply telephone filter for callers (not OG BEATZ)
+    if speaker != "OG BEATZ":
         try:
             apply_telephone_filter(raw_path, final_path, boost=boost)
             print(f"    [{turn_index}] ✓ {speaker} ({voice}) + telephone filter{' (boosted)' if boost else ''}")
@@ -220,8 +220,8 @@ def main():
     os.makedirs(segments_dir, exist_ok=True)
 
     # --- Phase 1: Parse all turns and assign voices (sequential) ---
-    assigned_voices = {"Paul": "Puck"}
-    assigned_accents = {"Paul": "British English accent as heard in London, England"}
+    assigned_voices = {"OG BEATZ": "Puck"}
+    assigned_accents = {"OG BEATZ": "American English"}
     female_index = 0
     male_index = 0
     prepared_turns = []
