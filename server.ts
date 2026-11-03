@@ -3,6 +3,7 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import { createInteraction, streamInteraction, API_BASE_URL } from "./server/lib/agentClient.ts";
 import { extractJsonBlocks } from "./server/lib/jsonExtractor.ts";
+import { generateDirectEpisode } from "./server/lib/directEpisode.ts";
 import { exec } from 'child_process';
 import util from 'util';
 import fs from "fs";
@@ -509,6 +510,20 @@ async function startServer() {
     }
   }
 
+  // A failed generation must not use one of the shared daily credits.
+  function refundQuotaCount(userHash: string): void {
+    try {
+      const cache = fs.existsSync(QUOTA_CACHE_FILE)
+        ? JSON.parse(fs.readFileSync(QUOTA_CACHE_FILE, "utf8"))
+        : {};
+      const cacheKey = `${getTodayStr()}_${userHash}`;
+      cache[cacheKey] = Math.max(0, (Number(cache[cacheKey]) || 0) - 1);
+      fs.writeFileSync(QUOTA_CACHE_FILE, JSON.stringify(cache, null, 2), "utf8");
+    } catch (error) {
+      console.error("[quota] Could not refund unsuccessful episode:", error);
+    }
+  }
+
   app.get("/api/quota", async (req, res) => {
     if (process.env.NODE_ENV !== "production") {
       return res.json({ used: 0, limit: 999999 });
@@ -526,7 +541,17 @@ async function startServer() {
     // Run background cleanup list whenever a new show is request to optimize disk space
     cleanUpOldGenerations();
 
-    const { topic, duration = "15", mood = "Informative", generationId } = req.body;
+    const { topic, duration = "3", mood = "Informative", generationId } = req.body;
+    if (process.env.RADIO_GENERATION_MODE !== "agent") {
+      const requestedMinutes = Number(duration);
+      if (!Number.isFinite(requestedMinutes) || requestedMinutes < 1 || requestedMinutes > 5) {
+        return res.status(400).json({ error: "Choose a show duration between 1 and 5 minutes for direct audio generation." });
+      }
+      if (typeof topic !== "string" || !topic.trim()) {
+        return res.status(400).json({ error: "Enter a topic to generate a radio episode." });
+      }
+    }
+    let chargedQuotaHash: string | null = null;
 
     if (!process.env.GEMINI_API_KEY) {
       return res.status(503).json({ error: "Show generation is not configured: GEMINI_API_KEY is missing on the server." });
@@ -544,6 +569,7 @@ async function startServer() {
         }
         // Deduct (increment) the quota immediately before starting the generation to prevent concurrent bypasses
         incrementQuotaCount(userHash);
+        chargedQuotaHash = userHash;
       }
     }
 
@@ -582,6 +608,35 @@ async function startServer() {
     req.on('close', () => {
       clearInterval(heartbeatInterval);
     });
+
+    // Use short, direct Gemini calls by default. This avoids the managed
+    // agent's ten-minute 504 deadline. Restore it only with RADIO_GENERATION_MODE=agent.
+    if (process.env.RADIO_GENERATION_MODE !== "agent") {
+      try {
+        const episode = await generateDirectEpisode({
+          topic: String(topic),
+          duration: Number(duration),
+          mood: String(mood),
+          signal: abortController.signal,
+          progress: message => sendEvent({ type: "info", message })
+        });
+        sendEvent({ type: "show_data", data: episode });
+        sendEvent({ type: "status", status: "completed" });
+      } catch (err: any) {
+        if (chargedQuotaHash) refundQuotaCount(chargedQuotaHash);
+        console.error("[direct-radio] Episode failed:", err);
+        const message = abortController.signal.aborted
+          ? "Episode generation was cancelled."
+          : (err?.message || "Radio show generation failed.");
+        sendEvent({ type: "error", message });
+      } finally {
+        isFinished = true;
+        clearInterval(heartbeatInterval);
+        if (generationId) activeGenerations.delete(generationId);
+        res.end();
+      }
+      return;
+    }
 
     try {
       console.log(`[generate-show] Request received for topic: "${topic}", duration: "${duration}", mood: "${mood}", generationId: "${generationId}"`);
