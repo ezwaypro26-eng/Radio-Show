@@ -10,22 +10,25 @@ type EpisodeRequest = {
 
 type AudioSegment = { pcm: Buffer; rate: number; channels: number; sampleWidth: number };
 
-const API = "https://generativelanguage.googleapis.com/v1beta/models/";
+const API_ROOT = "https://generativelanguage.googleapis.com/v1beta";
 
-async function askGemini(model: string, body: unknown, signal: AbortSignal, timeout = 90000): Promise<any> {
+async function askGemini(model: string, body: unknown, signal: AbortSignal, timeout = 90000, endpoint: "generateContent" | "interactions" = "generateContent"): Promise<any> {
   if (!process.env.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY has not been configured.");
   const controller = new AbortController();
   const onAbort = () => controller.abort();
   signal.addEventListener("abort", onAbort, { once: true });
   const timer = setTimeout(() => controller.abort(), timeout);
   try {
-    const response = await fetch(API + encodeURIComponent(model) + ":generateContent", {
+    const url = endpoint === "interactions"
+      ? API_ROOT + "/interactions"
+      : API_ROOT + "/models/" + encodeURIComponent(model) + ":generateContent";
+    const response = await fetch(url, {
       method: "POST",
       headers: {
         "x-goog-api-key": process.env.GEMINI_API_KEY,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(endpoint === "interactions" ? { model, ...(body as Record<string, unknown>) } : body),
       signal: controller.signal
     });
     const text = await response.text();
@@ -59,9 +62,11 @@ async function writeEpisodeScript(topic: string, duration: number, mood: string,
     "Make the show entertaining and useful, not robotic or forced slang. Do not invent interviews or quotations.",
     "Return ONLY the exact words to be spoken. No speaker labels, headings, numbered sections or stage directions."
   ].join("\n");
-  const preferred = process.env.GEMINI_TEXT_MODEL || "gemini-2.5-flash";
+  const configured = process.env.GEMINI_TEXT_MODEL?.trim();
+  const preferred = configured && /^gemini-3\.(5-flash-lite|6-flash|8-flash)$/.test(configured)
+    ? configured : "gemini-3.5-flash-lite";
   let lastError: Error | null = null;
-  for (const model of [preferred, "gemini-2.5-flash-lite"]) {
+  for (const model of [...new Set([preferred, "gemini-3.8-flash"])]) {
     try {
       const result = await askGemini(model, {
         contents: [{ role: "user", parts: [{ text: brief }] }],
@@ -130,28 +135,35 @@ function decodeAudio(buffer: Buffer): AudioSegment {
 
 async function voiceChunk(script: string, signal: AbortSignal): Promise<AudioSegment> {
   let lastError: Error | null = null;
-  const models = [process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts", "gemini-3.1-flash-tts-preview"];
-  const tried = new Set<string>();
+  // The Gemini 3.8 TTS models use the Interactions API and a speech_config voice.
+  // Do not fall back to 2.5 TTS: access to legacy 2.5 models is restricted for new users.
+  const configured = process.env.GEMINI_TTS_MODEL?.trim();
+  const preferred = configured && /^gemini-3\.8-flash(-lite)?-tts$/.test(configured)
+    ? configured : "gemini-3.8-flash-lite-tts";
+  const models = [...new Set([preferred, "gemini-3.8-flash-tts"])];
   for (const model of models) {
-    if (tried.has(model)) continue;
-    tried.add(model);
     try {
       const result = await askGemini(model, {
-        contents: [{
-          role: "user",
-          parts: [{
-            text: "Read the following exact words as OG BEATZ, the single host of a hip-hop radio show, speaking in a warm, authentic, conversational American voice. Do not add anything: " + script
+        input: [{
+          type: "user_input",
+          content: [{
+            type: "text",
+            text: script,
+            annotations: [{
+              type: "speech_metadata",
+              style: "Warm, charismatic, conversational American hip-hop radio host; natural pacing, confident but never exaggerated."
+            }]
           }]
         }],
-        generationConfig: {
-          responseModalities: ["AUDIO"],
-          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Fenrir" } } }
-        }
-      }, signal, 90000);
-      const inline = (result?.candidates?.[0]?.content?.parts || [])
-        .map((part: any) => part.inlineData).find((part: any) => !!part?.data);
-      if (!inline?.data) throw new Error("The speech model returned no audio.");
-      const audio = decodeAudio(Buffer.from(inline.data, "base64"));
+        response_format: { type: "audio", mime_type: "audio/l16", sample_rate: 24000 },
+        generation_config: { speech_config: [{ voice: "Fenrir" }] }
+      }, signal, 90000, "interactions");
+      const audioBlock = (result?.steps || [])
+        .flatMap((step: any) => Array.isArray(step?.content) ? step.content : [])
+        .find((part: any) => part?.type === "audio" && typeof part?.data === "string");
+      const encoded = audioBlock?.data || result?.output_audio?.data;
+      if (!encoded) throw new Error("The speech model returned no audio.");
+      const audio = decodeAudio(Buffer.from(encoded, "base64"));
       if (audio.sampleWidth !== 2 || audio.channels !== 1 || audio.rate !== 24000) {
         throw new Error("The voice model returned an unsupported audio format.");
       }
@@ -162,7 +174,7 @@ async function voiceChunk(script: string, signal: AbortSignal): Promise<AudioSeg
       console.warn("[direct-radio] TTS attempt failed:", String(error?.message || error).slice(0, 300));
     }
   }
-  throw lastError || new Error("All speech models failed.");
+  throw lastError || new Error("Google could not generate the speech.");
 }
 
 function waveFromPcm(pcm: Buffer): Buffer {
