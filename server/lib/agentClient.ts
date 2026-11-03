@@ -162,9 +162,9 @@ export async function* streamInteraction(
     // Not all API failures are SSE events; detect trailing plain-text/JSON errors.
     if (!gotComplete) {
       const tail = nonEventText + buffer;
-      if (/DEADLINE_EXCEEDED|Deadline expired|\\"code\\"\s*:\s*504/i.test(tail)) {
+      if (/DEADLINE_EXCEEDED|Deadline expired|"code"\s*:\s*504/i.test(tail)) {
         yield { type: "error", message: "Google timed out before the audio episode finished. Please try a shorter episode." };
-      } else if (/\\"error\\"\s*:/i.test(tail)) {
+      } else if (/"error"\s*:/i.test(tail)) {
         yield { type: "error", message: "Google stopped the generation request before finishing the audio episode." };
       }
     }
