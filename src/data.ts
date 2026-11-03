@@ -24,7 +24,7 @@ export function transformShow(raw: RawRadioShow): RadioShow {
     duration: parseTimecode(raw.show_duration),
     summary: raw.two_sentence_summary,
     date: raw.date_of_generation,
-    host: raw.timecoded_transcript[0]?.speaker || "Paul",
+    host: raw.timecoded_transcript[0]?.speaker || "OG BEATZ",
     coverImage: raw.coverImage || "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2070&auto=format&fit=crop",
     audioUrl: raw.audioUrl || "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
     notesUrl: raw.notesUrl,
