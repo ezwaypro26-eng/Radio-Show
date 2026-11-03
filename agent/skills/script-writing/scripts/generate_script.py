@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Generate the AI Talk Radio radio show script from research using the Interactions API.
+"""Generate the THE OG BEATZ RADIO SHOW radio show script from research using the Interactions API.
 
 Usage:
     python3 generate_script.py --workspace ./workspace
@@ -30,22 +30,24 @@ import argparse
 import os
 from google import genai
 
-BASE_PROMPT = """You are a scriptwriter for "AI Talk Radio", a community radio show for a nerdy, tech-savvy audience.
+BASE_PROMPT = """You are a scriptwriter for "THE OG BEATZ RADIO SHOW", a music, hip-hop culture and creative technology show for independent artists and producers.
 
 Write a ~3-minute radio script based on the research provided. The show has:
 
-**Host**: Paul (in the studio) — a calm, measured British moderator broadcasting from a London studio. Professional, intellectual, and polite.
+**Host**: OG BEATZ (in the studio) — an authentic, charismatic hip-hop producer and radio host, speaking naturally in US English with studio-quality delivery.
 
 **Format rules:**
-- Every line MUST start with a speaker name and colon: `Paul:` or `[CallerName]:`
+- OG BEATZ is the ONLY HOST. All other named speakers are fictional callers or guests; never announce a co-host or second presenter.
+- Stay on the user-requested topic and avoid robotic or stereotypical slang.
+- Every line MUST start with a speaker name and colon: `OG BEATZ:` or `[CallerName]:`
 - You MUST include a gender tag `[Male]` or `[Female]` at the beginning of the transcript for every caller turn.
 - You MUST include an **accent tag** `[Accent: <accent_description>]` matching the location the caller is supposedly calling from (e.g., `[Accent: Irish]` if calling from Dublin, `[Accent: Southern US]` if from Texas, `[Accent: Australian]` from Sydney, etc.).
 - Example: `Caller1: [Male] [Accent: Irish] [hesitantly] I think...`
 - You MUST include **audio tags** in square brackets to indicate how a line should be delivered.
 - Use tags like `[sighs]`, `[frustratedly]`, `[calmly]`, `[whispers]`, `[indignantly]` to make performances rich.
 - **CRITICAL**: The callers are amateurs. They should sound rough, imperfect, and natural. They should NOT speak in perfect, complete sentences. They should cut themselves off, use fillers like "uh", "like", "you know".
-- **Tone**: Callers are smart, tech-savvy individuals (nerds), not experts but informed. Their speech is imperfect because it is spontaneous, not because they lack intelligence.
-- **Host Introduction**: Host Paul MUST always introduce a new caller by name and location before they speak for the first time.
+- **Tone**: Callers are everyday music creators and listeners who speak naturally, not actors or co-hosts. Their speech is imperfect because it is spontaneous, not because they lack intelligence.
+- **Host Introduction**: Host OG BEATZ MUST always introduce a new caller by name and location before they speak for the first time.
 - No stage directions outside of the audio tags in the transcript.
 - Keep sentences short and punchy — this is spoken word.
 - Target ~450-500 words total.
@@ -74,10 +76,10 @@ STYLE_PROMPTS = {
 **Callers**: For each topic, generate TWO callers representing opposing views. They should disagree respectfully but firmly.
 
 **Structure:**
-1. Cold Open (10 sec): Paul teases the most controversial take.
-2. Intro (15 sec): Paul welcomes listeners, sets up the debate format.
-3. Debate Segments (2.5 min): Paul introduces a topic, takes calls from two sides. Callers argue their positions, Paul moderates.
-4. Closing (15 sec): Paul summarizes both sides, thanks callers.""",
+1. Cold Open (10 sec): OG BEATZ teases the most controversial take.
+2. Intro (15 sec): OG BEATZ welcomes listeners, sets up the debate format.
+3. Debate Segments (2.5 min): OG BEATZ introduces a topic, takes calls from two sides. Callers argue their positions, OG BEATZ moderates.
+4. Closing (15 sec): OG BEATZ summarizes both sides, thanks callers.""",
 
     "roundtable": """
 **Style: ROUNDTABLE**
@@ -85,21 +87,21 @@ STYLE_PROMPTS = {
 **Callers**: 3-4 callers each bringing a different angle on the topic. Collaborative, building on each other's points rather than arguing.
 
 **Structure:**
-1. Cold Open (10 sec): Paul previews the topic.
-2. Intro (15 sec): Paul welcomes the panel and introduces each caller.
-3. Discussion (2.5 min): Open conversation — callers riff on each other's points, Paul guides the flow.
-4. Closing (15 sec): Paul ties the threads together.""",
+1. Cold Open (10 sec): OG BEATZ previews the topic.
+2. Intro (15 sec): OG BEATZ welcomes the panel and introduces each caller.
+3. Discussion (2.5 min): Open conversation — callers riff on each other's points, OG BEATZ guides the flow.
+4. Closing (15 sec): OG BEATZ ties the threads together.""",
 
     "interview": """
 **Style: INTERVIEW**
 
-**Callers**: 1-2 callers presented as people with direct experience or deep knowledge. Paul asks probing questions — this is more Q&A than conversation.
+**Callers**: 1-2 callers presented as people with direct experience or deep knowledge. OG BEATZ asks probing questions — this is more Q&A than conversation.
 
 **Structure:**
-1. Cold Open (10 sec): Paul teases what the guest will reveal.
-2. Intro (15 sec): Paul introduces the guest(s) and their background.
-3. Interview (2.5 min): Paul asks questions, guest(s) answer in depth. Follow-up questions encouraged.
-4. Closing (15 sec): Paul thanks the guest(s) and summarizes key takeaways.""",
+1. Cold Open (10 sec): OG BEATZ teases what the guest will reveal.
+2. Intro (15 sec): OG BEATZ introduces the guest(s) and their background.
+3. Interview (2.5 min): OG BEATZ asks questions, guest(s) answer in depth. Follow-up questions encouraged.
+4. Closing (15 sec): OG BEATZ thanks the guest(s) and summarizes key takeaways.""",
 
     "explainer": """
 **Style: EXPLAINER**
@@ -107,10 +109,10 @@ STYLE_PROMPTS = {
 **Callers**: 2-3 callers who each explain a different aspect of the topic. Think of it as a collaborative "teach the audience" format.
 
 **Structure:**
-1. Cold Open (10 sec): Paul poses a question the audience might be wondering.
-2. Intro (15 sec): Paul sets up the topic and says we have people who can break it down.
-3. Explainer Segments (2.5 min): Each caller explains their piece. Paul asks clarifying questions on behalf of the audience.
-4. Closing (15 sec): Paul recaps the key points.""",
+1. Cold Open (10 sec): OG BEATZ poses a question the audience might be wondering.
+2. Intro (15 sec): OG BEATZ sets up the topic and says we have people who can break it down.
+3. Explainer Segments (2.5 min): Each caller explains their piece. OG BEATZ asks clarifying questions on behalf of the audience.
+4. Closing (15 sec): OG BEATZ recaps the key points.""",
 }
 
 # Default style when none specified
@@ -120,7 +122,7 @@ VALID_STYLES = list(STYLE_PROMPTS.keys())
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate AI Talk Radio radio script")
+    parser = argparse.ArgumentParser(description="Generate THE OG BEATZ RADIO SHOW radio script")
     parser.add_argument("--workspace", default="workspace", help="Workspace directory")
     parser.add_argument(
         "--style",
@@ -179,7 +181,7 @@ def main():
     if args.context:
         system_prompt += f"\n\n**ADDITIONAL CONTEXT FROM USER**: {args.context}\n(Note: Incorporate this context naturally. Maintain the show's grounded, conversational tone. Apply this context ONLY to the tone and style of the conversation; do NOT use it to limit or dictate which specific stories or facts from the research are discussed.)"
 
-    print(f"=== AI Talk Radio: Script Generation ===\n")
+    print(f"=== THE OG BEATZ RADIO SHOW: Script Generation ===\n")
     print(f"Style: {args.style}")
     print(f"Read {len(research)} characters of research.")
     print("Generating script via Interactions API...\n")
