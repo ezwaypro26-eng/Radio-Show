@@ -220,7 +220,7 @@ def main():
     os.makedirs(segments_dir, exist_ok=True)
 
     # --- Phase 1: Parse all turns and assign voices (sequential) ---
-    assigned_voices = {"OG BEATZ": "Puck"}
+    assigned_voices = {"OG BEATZ": "Fenrir"}
     assigned_accents = {"OG BEATZ": "American English"}
     female_index = 0
     male_index = 0
