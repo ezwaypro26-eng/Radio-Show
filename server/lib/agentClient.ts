@@ -110,78 +110,68 @@ export async function createInteraction(
 export async function* streamInteraction(
   response: Response
 ): AsyncGenerator<AgentEvent> {
-  console.log(`[streamInteraction] Initializing stream reader on body present: ${!!response.body}`);
   const reader = response.body?.getReader();
   if (!reader) {
-    console.error(`[streamInteraction] Error: response.body.getReader() is undefined!`);
-    yield { type: "error", message: "No response body" };
+    yield { type: "error", message: "Google did not return a response stream." };
     return;
   }
 
   const decoder = new TextDecoder();
   let buffer = "";
-  let chunkCount = 0;
+  let nonEventText = "";
+  let gotComplete = false;
 
   try {
     while (true) {
-      console.log(`[streamInteraction] Pre-read: Awaiting chunk #${chunkCount + 1}...`);
       const { done, value } = await reader.read();
-      console.log(`[streamInteraction] Post-read: chunk #${chunkCount + 1} done=${done}, value_length=${value ? value.length : 0}`);
-      if (done) {
-        console.log(`[streamInteraction] Stream reader reported done.`);
-        break;
-      }
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
 
-      chunkCount++;
-      const decoded = decoder.decode(value, { stream: true });
-      console.log(`[streamInteraction] Raw decoded chunk text length: ${decoded.length}, contents (first 200 chars): "${decoded.substring(0, 200)}"`);
-      buffer += decoded;
-
-      // Process complete lines
       const lines = buffer.split("\n");
-      buffer = lines.pop() ?? ""; // Keep incomplete line in buffer
-
-      console.log(`[streamInteraction] Processing ${lines.length} lines from buffer. Leftover buffer size: ${buffer.length}`);
+      buffer = lines.pop() ?? "";
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed) continue;
-        console.log(`[streamInteraction] Parsing line: "${trimmed}"`);
 
-        if (!trimmed.startsWith("data: ")) {
-          console.log(`[streamInteraction] Skipping non-SSE line: "${trimmed}"`);
+        if (!trimmed.startsWith("data:")) {
+          // Google can append a plain JSON 504/error after an otherwise valid SSE stream.
+          if (!trimmed.startsWith("event:") && !trimmed.startsWith(":")) {
+            nonEventText = (nonEventText + trimmed + "\n").slice(-12000);
+          }
           continue;
         }
 
-        const dataStr = trimmed.slice(6); // Strip "data: " prefix
-        console.log(`[streamInteraction] SSE Payload data content: "${dataStr}"`);
+        const dataStr = trimmed.slice(5).trim();
         if (dataStr === "[DONE]") {
-          console.log(`[streamInteraction] Received [DONE] token.`);
           yield { type: "done" };
           return;
         }
-
         try {
-          const data = JSON.parse(dataStr);
-          const event = parseAgentEvent(data);
+          const parsed = JSON.parse(dataStr);
+          const event = parseAgentEvent(parsed);
           if (event) {
-            console.log(`[streamInteraction] Successfully parsed event: type="${event.type}"`);
+            if (event.type === "complete") gotComplete = true;
             yield event;
-          } else {
-            console.log(`[streamInteraction] parseAgentEvent returned null for data:`, JSON.stringify(data).substring(0, 100));
           }
-        } catch (jsonErr: any) {
-          console.error(`[streamInteraction] JSON Parse Error on payload "${dataStr}":`, jsonErr.message);
-          // Malformed JSON line — skip
-          continue;
+        } catch (err) {
+          console.warn("[streamInteraction] Skipped malformed SSE event:", err);
         }
       }
     }
+
+    // Not all API failures are SSE events; detect trailing plain-text/JSON errors.
+    if (!gotComplete) {
+      const tail = nonEventText + buffer;
+      if (/DEADLINE_EXCEEDED|Deadline expired|\\"code\\"\s*:\s*504/i.test(tail)) {
+        yield { type: "error", message: "Google timed out before the audio episode finished. Please try a shorter episode." };
+      } else if (/\\"error\\"\s*:/i.test(tail)) {
+        yield { type: "error", message: "Google stopped the generation request before finishing the audio episode." };
+      }
+    }
   } catch (err: any) {
-    console.error(`[streamInteraction] Exception caught in read loop:`, err);
-    yield { type: "error", message: `Stream read exception: ${err.message}` };
+    yield { type: "error", message: `Generation stream interrupted: ${err?.message || String(err)}` };
   } finally {
     reader.releaseLock();
-    console.log(`[streamInteraction] Stream reader released lock.`);
   }
 }
 
@@ -316,6 +306,5 @@ function parseAgentEvent(
     };
   }
 
-  console.log(`[parseAgentEvent] Diagnostic: Unhandled event_type="${eventType}":`, JSON.stringify(event).substring(0, 300));
   return null;
 }
