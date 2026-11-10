@@ -1,4 +1,5 @@
 import { spawn } from "child_process";
+import { elevenLabsPcmChunk } from "./elevenlabsTts.ts";
 
 type EpisodeRequest = {
   topic: string;
@@ -198,6 +199,10 @@ async function pacedSpeechCall(model: string, script: string, signal: AbortSigna
 }
 
 async function voiceChunk(script: string, signal: AbortSignal): Promise<AudioSegment> {
+  if (process.env.RADIO_TTS_PROVIDER?.trim().toLowerCase() === "elevenlabs") {
+    const pcm = await elevenLabsPcmChunk(script, signal);
+    return { pcm, rate: 24000, channels: 1, sampleWidth: 2 };
+  }
   // One TTS model only: switching to another model after a 429 can trigger
   // a separate daily limit and unnecessarily consume more API requests.
   const configured = process.env.GEMINI_TTS_MODEL?.trim();
