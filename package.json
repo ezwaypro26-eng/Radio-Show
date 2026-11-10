@@ -9,7 +9,8 @@
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test:elevenlabs": "node scripts/elevenlabs-radio-test.mjs"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.19.0",
@@ -28,7 +29,8 @@
     "pako": "^2.1.0",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
-    "vite": "^6.2.3"
+    "vite": "^6.2.3",
+    "@elevenlabs/elevenlabs-js": "^2.77.0"
   },
   "devDependencies": {
     "@types/archiver": "^7.0.0",

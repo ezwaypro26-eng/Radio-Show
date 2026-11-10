@@ -1,9 +1,12 @@
 import { spawn } from "child_process";
+import { elevenLabsPcmChunk } from "./elevenlabsTts.ts";
+import { callerBeep, isCaller, parseRoundtable, roundtableBrief, roundtableNames, silenceMs, telephonePcm, type RoundtableSpeaker, type RoundtableTurn } from "./roundtable.ts";
 
 type EpisodeRequest = {
   topic: string;
   duration: number;
   mood: string;
+  format?: "solo" | "roundtable";
   signal: AbortSignal;
   progress: (message: string) => void;
 };
@@ -85,6 +88,35 @@ async function writeEpisodeScript(topic: string, duration: number, mood: string,
     }
   }
   throw lastError || new Error("Google could not write the episode script.");
+}
+
+async function writeRoundtableTurns(topic: string, duration: number, mood: string, signal: AbortSignal): Promise<RoundtableTurn[]> {
+  const configured = process.env.GEMINI_TEXT_MODEL?.trim();
+  const preferred = configured && /^gemini-3\.(5-flash-lite|6-flash|8-flash)$/.test(configured)
+    ? configured : "gemini-3.5-flash-lite";
+  const prompt = roundtableBrief(topic, duration, mood);
+  let lastError: Error | null = null;
+  for (const model of [...new Set([preferred, "gemini-3.8-flash"])]) {
+    try {
+      const result = await askGemini(model, {
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.7,
+          responseMimeType: "application/json",
+          maxOutputTokens: duration <= 3 ? 2800 : 4200
+        }
+      }, signal, 75000);
+      const text = (result?.candidates?.[0]?.content?.parts || [])
+        .map((part: any) => part.text || "").join("").trim();
+      return parseRoundtable(text);
+    } catch (err: any) {
+      lastError = err;
+      if (signal.aborted) throw err;
+      // Do not retry a Gemini quota or billing failure with another model.
+      if (/\b429\b|quota|resource_exhausted|billing|permission|API key/i.test(String(err?.message || err))) throw err;
+    }
+  }
+  throw lastError || new Error("Google could not produce the roundtable dialogue.");
 }
 
 function speechChunks(script: string, maximumCharacters = 630): string[] {
@@ -198,6 +230,10 @@ async function pacedSpeechCall(model: string, script: string, signal: AbortSigna
 }
 
 async function voiceChunk(script: string, signal: AbortSignal): Promise<AudioSegment> {
+  if (process.env.RADIO_TTS_PROVIDER?.trim().toLowerCase() === "elevenlabs") {
+    const pcm = await elevenLabsPcmChunk(script, signal);
+    return { pcm, rate: 24000, channels: 1, sampleWidth: 2 };
+  }
   // One TTS model only: switching to another model after a 429 can trigger
   // a separate daily limit and unnecessarily consume more API requests.
   const configured = process.env.GEMINI_TTS_MODEL?.trim();
@@ -263,21 +299,69 @@ export async function generateDirectEpisode(options: EpisodeRequest): Promise<an
     throw new Error("For reliable voice generation, choose a duration between 1 and 5 minutes.");
   }
   if (!options.topic?.trim()) throw new Error("Please enter a show topic.");
-  options.progress("Writing the OG BEATZ radio script...");
-  const script = await writeEpisodeScript(options.topic, minutes, options.mood, options.signal);
-  const chunks = speechChunks(script);
-  if (!chunks.length) throw new Error("The show script was empty.");
+
+  const isRoundtable = options.format === "roundtable";
+  if (isRoundtable && process.env.RADIO_TTS_PROVIDER?.trim().toLowerCase() !== "elevenlabs") {
+    throw new Error("Roundtable requires ElevenLabs narration. Set RADIO_TTS_PROVIDER=elevenlabs in your private .env.local and restart the server.");
+  }
+  if (isRoundtable && !process.env.ELEVENLABS_VOICE_ID?.trim()) {
+    throw new Error("Set ELEVENLABS_VOICE_ID to your OG BEATZ voice clone in .env.local before generating a roundtable.");
+  }
+
+  options.progress(isRoundtable ? "Writing the OG BEATZ roundtable conversation with fictional call-ins..." : "Writing the OG BEATZ radio script...");
+  const turns: RoundtableTurn[] = isRoundtable
+    ? await writeRoundtableTurns(options.topic, minutes, options.mood, options.signal)
+    : [{ speaker: "host", text: await writeEpisodeScript(options.topic, minutes, options.mood, options.signal) }];
+
+  // Defaults are public ElevenLabs stock voices. Override IDs in private .env.local.
+  const voiceByRole: Record<RoundtableSpeaker, string | undefined> = {
+    host: process.env.ELEVENLABS_VOICE_ID?.trim(),
+    panel1: process.env.ELEVENLABS_PANEL_VOICE_1?.trim() || "JBFqnCBsd6RMkjVDRZzb",
+    panel2: process.env.ELEVENLABS_PANEL_VOICE_2?.trim() || "21m00Tcm4TlvDq8ikWAM",
+    caller1: process.env.ELEVENLABS_CALLER_VOICE_1?.trim() || "TxGEqnHWrfWFTfGW9XjX",
+    caller2: process.env.ELEVENLABS_CALLER_VOICE_2?.trim() || "EXAVITQu4vr4xnSDxMaL"
+  };
 
   const audios: Buffer[] = [];
   const transcript: Array<{ timecode: string; speaker: string; text: string }> = [];
   let seconds = 0;
-  for (let i = 0; i < chunks.length; i++) {
+  const introducedCallers = new Set<RoundtableSpeaker>();
+  let segmentIndex = 0;
+  const totalSegments = turns.reduce((sum, turn) => sum + speechChunks(turn.text, isRoundtable ? 480 : 630).length, 0);
+  if (!totalSegments) throw new Error("The show script was empty.");
+
+  for (let turnIndex = 0; turnIndex < turns.length; turnIndex++) {
+    const turn = turns[turnIndex];
     if (options.signal.aborted) throw new Error("Generation was cancelled.");
-    options.progress("Recording OG BEATZ voice segment " + (i + 1) + " of " + chunks.length + "...");
-    transcript.push({ timecode: stamp(seconds), speaker: "OG BEATZ", text: chunks[i] });
-    const clip = await voiceChunk(chunks[i], options.signal);
-    audios.push(clip.pcm);
-    seconds += clip.pcm.length / 48000;
+    if (isRoundtable && isCaller(turn.speaker) && !introducedCallers.has(turn.speaker)) {
+      const connect = Buffer.concat([silenceMs(80), callerBeep(), silenceMs(140)]);
+      audios.push(connect);
+      seconds += connect.length / 48000;
+      introducedCallers.add(turn.speaker);
+    }
+    const chunks = speechChunks(turn.text, isRoundtable ? 480 : 630);
+    for (const chunk of chunks) {
+      if (options.signal.aborted) throw new Error("Generation was cancelled.");
+      segmentIndex++;
+      const name = isRoundtable ? roundtableNames[turn.speaker] : "OG BEATZ";
+      options.progress("Recording " + name + " — segment " + segmentIndex + " of " + totalSegments + "...");
+      const clip = isRoundtable
+        ? { pcm: await elevenLabsPcmChunk(chunk, options.signal, voiceByRole[turn.speaker], turn.speaker), rate: 24000, channels: 1, sampleWidth: 2 }
+        : await voiceChunk(chunk, options.signal);
+      const pcm = isRoundtable && isCaller(turn.speaker) ? telephonePcm(clip.pcm) : clip.pcm;
+      transcript.push({ timecode: stamp(seconds), speaker: name, text: chunk });
+      audios.push(pcm);
+      seconds += pcm.length / 48000;
+    }
+    if (isRoundtable && turnIndex < turns.length - 1) {
+      // A predictable gap after every speaker makes a panel sound like a
+      // slideshow. Questions and short interjections get a snappier reply.
+      const shortReaction = turn.text.split(/\s+/).length <= 12;
+      const pauseMs = turn.text.endsWith("?") || shortReaction ? 45 : isCaller(turn.speaker) ? 110 : 75;
+      const pause = silenceMs(pauseMs);
+      audios.push(pause);
+      seconds += pause.length / 48000;
+    }
   }
 
   options.progress("Assembling the full episode audio...");
@@ -289,9 +373,11 @@ export async function generateDirectEpisode(options: EpisodeRequest): Promise<an
     : "data:audio/wav;base64," + waveFromPcm(pcm).toString("base64");
 
   return {
-    show_title: "THE OG BEATZ RADIO SHOW",
+    show_title: "THE OG BEATZ RADIO SHOW" + (isRoundtable ? " — Roundtable" : ""),
     show_duration: stamp(seconds),
-    two_sentence_summary: "OG BEATZ discusses " + options.topic.replace(/\s+/g, " ").slice(0, 160) + ". One host, one conversation about music and creative tools.",
+    two_sentence_summary: isRoundtable
+      ? "OG BEATZ moderates a fictional roundtable about " + options.topic.replace(/\s+/g, " ").slice(0, 120) + ". All panelists and phone callers are AI-generated, not real people on live calls."
+      : "OG BEATZ discusses " + options.topic.replace(/\s+/g, " ").slice(0, 160) + ". One host, one conversation about music and creative tools.",
     date_of_generation: new Date().toISOString().slice(0, 10),
     timecoded_transcript: transcript,
     audioUrl,

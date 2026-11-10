@@ -143,6 +143,7 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [targetDuration, setTargetDuration] = useState('3');
+  const [showFormat, setShowFormat] = useState<'roundtable' | 'solo'>('roundtable');
   const [targetMood, setTargetMood] = useState('Informative');
   const [selectedCategory, setSelectedCategory] = useState<'tech' | 'culture' | 'news'>('tech');
 
@@ -990,6 +991,7 @@ export default function App() {
         topic: p,
         duration: d,
         mood: m,
+        format: showFormat,
         generationId
       });
 
@@ -1000,6 +1002,7 @@ export default function App() {
           topic: p,
           duration: d,
           mood: m,
+          format: showFormat,
           generationId
         }),
         signal: abortControllerRef.current.signal
@@ -1618,6 +1621,18 @@ export default function App() {
                     <div className="flex flex-wrap items-center justify-between border-t border-white/5 pt-3 mt-1.5 gap-4">
                       {/* Left controls */}
                       <div className="flex flex-wrap items-center gap-3">
+                        {/* Radio format selector */}
+                        <div className="flex items-center gap-2 bg-white/[0.04] border border-white/5 rounded-full px-3 py-1.5 hover:bg-white/[0.08] transition-all">
+                          <select
+                            aria-label="Show format"
+                            value={showFormat}
+                            onChange={(e) => setShowFormat(e.target.value as 'roundtable' | 'solo')}
+                            className="bg-transparent border-none text-[11px] font-bold text-white/70 focus:outline-none cursor-pointer uppercase tracking-wider pr-1"
+                          >
+                            <option value="roundtable" className="bg-neutral-900 text-white">Roundtable + Call-ins</option>
+                            <option value="solo" className="bg-neutral-900 text-white">Solo Host</option>
+                          </select>
+                        </div>
                         {/* Duration Selector */}
                         <div className="flex items-center gap-2 bg-white/[0.04] border border-white/5 rounded-full px-3 py-1.5 hover:bg-white/[0.08] transition-all relative focus-within:ring-2 focus-within:ring-io-blue focus-within:border-transparent">
                           <Clock className="w-3.5 h-3.5 text-white/40 shrink-0" />
@@ -1674,6 +1689,12 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+
+                {showFormat === 'roundtable' && (
+                  <p className="px-4 text-[11px] text-white/50">
+                    OG BEATZ hosts two AI panelists and two fictional, AI-generated listener phone calls. These are dramatized call-ins, not live calls.
+                  </p>
+                )}
 
                 {/* Sub-generation time & privacy guideline */}
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 text-[11px] text-white/30">
