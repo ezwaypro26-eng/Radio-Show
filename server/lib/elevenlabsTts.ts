@@ -1,47 +1,59 @@
 /**
- * Optional ElevenLabs speech for the OG BEATZ direct-episode pipeline.
- * The API key is read server-side only; do not expose it to the browser.
- * PCM 24 kHz / 16-bit / mono matches the existing episode mixer.
+ * Optional server-only ElevenLabs narration for THE OG BEATZ RADIO SHOW.
+ * Audio is 24 kHz / 16-bit / mono PCM, matching the existing episode mixer.
+ * The SDK reads ELEVENLABS_API_KEY from process.env after server startup.
  */
-export async function elevenLabsPcmChunk(text: string, signal: AbortSignal): Promise<Buffer> {
-  const apiKey = process.env.ELEVENLABS_API_KEY?.trim();
-  if (!apiKey) {
-    throw new Error("ElevenLabs voice is selected but ELEVENLABS_API_KEY is not configured on the server. Run the ElevenLabs onboarding command in the project folder.");
-  }
+import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 
-  const voiceId = process.env.ELEVENLABS_VOICE_ID?.trim() || "JBFqnCBsd6RMkjVDRZzb"; // George sample voice
+export async function elevenLabsPcmChunk(text: string, signal: AbortSignal): Promise<Buffer> {
+  if (!process.env.ELEVENLABS_API_KEY) {
+    throw new Error("ElevenLabs is selected but the server is missing ELEVENLABS_API_KEY. Complete CLI onboarding in this project.");
+  }
+  if (signal.aborted) throw new Error("Episode generation was cancelled.");
+
+  const voiceId = process.env.ELEVENLABS_VOICE_ID?.trim() || "JBFqnCBsd6RMkjVDRZzb"; // George, sample voice
   const modelId = process.env.ELEVENLABS_TTS_MODEL?.trim() || "eleven_multilingual_v2";
+
   const controller = new AbortController();
   const onAbort = () => controller.abort();
   signal.addEventListener("abort", onAbort, { once: true });
-  const timer = setTimeout(() => controller.abort(), 90000);
+  const timer = setTimeout(() => controller.abort(), 90_000);
+
   try {
-    const response = await fetch(
-      "https://api.elevenlabs.io/v1/text-to-speech/" + encodeURIComponent(voiceId) + "?output_format=pcm_24000",
-      {
-        method: "POST",
-        headers: {
-          "xi-api-key": apiKey,
-          "Content-Type": "application/json",
-          "Accept": "audio/pcm"
-        },
-        body: JSON.stringify({ text, model_id: modelId }),
-        signal: controller.signal
+    const client = new ElevenLabsClient();
+    const stream = await client.textToSpeech.convert(voiceId, {
+      text,
+      modelId,
+      outputFormat: "pcm_24000"
+    }, { abortSignal: controller.signal, timeoutInSeconds: 90, maxRetries: 0 });
+
+    const reader = stream.getReader();
+    const chunks: Buffer[] = [];
+    let totalBytes = 0;
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (!value?.length) continue;
+        totalBytes += value.byteLength;
+        // Guard against unexpected oversized responses; a single narration chunk is short.
+        if (totalBytes > 20 * 1024 * 1024) {
+          throw new Error("ElevenLabs returned unusually large audio.");
+        }
+        chunks.push(Buffer.from(value));
       }
-    );
-    if (!response.ok) {
-      const explanation = (await response.text()).slice(0, 350);
-      throw new Error("ElevenLabs speech HTTP " + response.status + ": " + explanation);
+    } finally {
+      reader.releaseLock();
     }
-    const pcm = Buffer.from(await response.arrayBuffer());
+
+    const pcm = Buffer.concat(chunks);
     if (pcm.length < 1024 || pcm.length % 2 !== 0) {
-      throw new Error("ElevenLabs returned incomplete or invalid PCM speech audio.");
+      throw new Error("ElevenLabs returned incomplete or invalid PCM speech.");
     }
     return pcm;
   } catch (error: any) {
-    if (controller.signal.aborted && !signal.aborted) {
-      throw new Error("ElevenLabs speech request timed out after 90 seconds.");
-    }
+    if (signal.aborted) throw new Error("Episode generation was cancelled.");
+    if (controller.signal.aborted) throw new Error("ElevenLabs speech request exceeded 90 seconds.");
     throw error;
   } finally {
     clearTimeout(timer);
