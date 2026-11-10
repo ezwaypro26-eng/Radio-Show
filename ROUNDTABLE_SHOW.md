@@ -45,6 +45,22 @@ Additional optional voice slots use distinct ElevenLabs stock voices by default 
 
 Use **Solo Host** from the dropdown for the previous one-voice program.
 
+## Making the show sound less generic
+
+The dialogue prompt now focuses on **a real studio argument** instead of an AI-generated panel of agreeable talking points. It starts cold, before introductions, with a specific dispute over the sound, session, money, ownership, or workflow. OG BEATZ calls out contradictions and moderates. Dre knows hands-on production/engineering, while Maya knows producing, songwriting and collaboration; neither exists merely as an "old school vs new school" stereotype.
+
+To keep the banter human, the script forbids stock assistant-sounding phrases, favors short replies, encourages interruptions as *dialogue* (not true overlapping audio), requires consequential counterarguments, and doesn't force everyone to agree. Caller opinions change the direction of the debate rather than simply echoing the panel.
+
+For a fuller panel, select **5 Min** rather than 3 Min; five speakers and two caller segments can feel cramped in a three-minute show. Five-minute episodes use more ElevenLabs credits.
+
+Voice generation now applies request-specific expressiveness/speed settings to different speakers and slightly tighter transition pauses. Your saved ElevenLabs voice clones are not modified.
+
+### Suggested test topic
+
+`A rapper pays a producer for a custom beat, then learns the producer used AI to sketch it in ten minutes. Should the price change? Make Dre and Maya argue over whether the artist is paying for TIME or the RESULT, then bring in callers who disagree with both.`
+
+If the new version still sounds too scripted, save the episode MP3 and the timecoded transcript and share them to identify whether the dialogue, voice performance or audio editing needs work. Nothing here has been runtime-verified on the user's Mac.
+
 ## Limits
 
 - The feature is in a GitHub draft branch, not live deployed and not yet runtime-tested on the user's Mac.
