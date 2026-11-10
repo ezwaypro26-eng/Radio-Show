@@ -1,0 +1,11 @@
+# Keep API credentials and CLI onboarding secrets private
+.env
+.env.*
+!.env.example
+
+# Local installs and generated radio episodes
+node_modules/
+dist/
+output/
+*.log
+.DS_Store
