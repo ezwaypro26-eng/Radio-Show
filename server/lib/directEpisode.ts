@@ -113,7 +113,7 @@ async function writeRoundtableTurns(topic: string, duration: number, mood: strin
       lastError = err;
       if (signal.aborted) throw err;
       // Do not retry a Gemini quota or billing failure with another model.
-      if (/\\b429\\b|quota|resource_exhausted|billing|permission|API key/i.test(String(err?.message || err))) throw err;
+      if (/\b429\b|quota|resource_exhausted|billing|permission|API key/i.test(String(err?.message || err))) throw err;
     }
   }
   throw lastError || new Error("Google could not produce the roundtable dialogue.");
@@ -371,8 +371,8 @@ export async function generateDirectEpisode(options: EpisodeRequest): Promise<an
     show_title: "THE OG BEATZ RADIO SHOW" + (isRoundtable ? " — Roundtable" : ""),
     show_duration: stamp(seconds),
     two_sentence_summary: isRoundtable
-      ? "OG BEATZ moderates a fictional roundtable about " + options.topic.replace(/\\s+/g, " ").slice(0, 120) + ". All panelists and phone callers are AI-generated, not real people on live calls."
-      : "OG BEATZ discusses " + options.topic.replace(/\\s+/g, " ").slice(0, 160) + ". One host, one conversation about music and creative tools.",
+      ? "OG BEATZ moderates a fictional roundtable about " + options.topic.replace(/\s+/g, " ").slice(0, 120) + ". All panelists and phone callers are AI-generated, not real people on live calls."
+      : "OG BEATZ discusses " + options.topic.replace(/\s+/g, " ").slice(0, 160) + ". One host, one conversation about music and creative tools.",
     date_of_generation: new Date().toISOString().slice(0, 10),
     timecoded_transcript: transcript,
     audioUrl,
