@@ -330,7 +330,8 @@ export async function generateDirectEpisode(options: EpisodeRequest): Promise<an
   const totalSegments = turns.reduce((sum, turn) => sum + speechChunks(turn.text, isRoundtable ? 480 : 630).length, 0);
   if (!totalSegments) throw new Error("The show script was empty.");
 
-  for (const turn of turns) {
+  for (let turnIndex = 0; turnIndex < turns.length; turnIndex++) {
+    const turn = turns[turnIndex];
     if (options.signal.aborted) throw new Error("Generation was cancelled.");
     if (isRoundtable && isCaller(turn.speaker) && !introducedCallers.has(turn.speaker)) {
       const connect = Buffer.concat([silenceMs(80), callerBeep(), silenceMs(140)]);
@@ -345,15 +346,19 @@ export async function generateDirectEpisode(options: EpisodeRequest): Promise<an
       const name = isRoundtable ? roundtableNames[turn.speaker] : "OG BEATZ";
       options.progress("Recording " + name + " — segment " + segmentIndex + " of " + totalSegments + "...");
       const clip = isRoundtable
-        ? { pcm: await elevenLabsPcmChunk(chunk, options.signal, voiceByRole[turn.speaker]), rate: 24000, channels: 1, sampleWidth: 2 }
+        ? { pcm: await elevenLabsPcmChunk(chunk, options.signal, voiceByRole[turn.speaker], turn.speaker), rate: 24000, channels: 1, sampleWidth: 2 }
         : await voiceChunk(chunk, options.signal);
       const pcm = isRoundtable && isCaller(turn.speaker) ? telephonePcm(clip.pcm) : clip.pcm;
       transcript.push({ timecode: stamp(seconds), speaker: name, text: chunk });
       audios.push(pcm);
       seconds += pcm.length / 48000;
     }
-    if (isRoundtable) {
-      const pause = silenceMs(110);
+    if (isRoundtable && turnIndex < turns.length - 1) {
+      // A predictable gap after every speaker makes a panel sound like a
+      // slideshow. Questions and short interjections get a snappier reply.
+      const shortReaction = turn.text.split(/\s+/).length <= 12;
+      const pauseMs = turn.text.endsWith("?") || shortReaction ? 45 : isCaller(turn.speaker) ? 110 : 75;
+      const pause = silenceMs(pauseMs);
       audios.push(pause);
       seconds += pause.length / 48000;
     }
