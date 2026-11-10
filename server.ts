@@ -9,6 +9,11 @@ import util from 'util';
 import fs from "fs";
 import { Storage } from "@google-cloud/storage";
 import crypto from "crypto";
+import { config as loadDotEnv } from "dotenv";
+
+// Keep server-side credentials out of Git. Values supplied by the host take priority.
+loadDotEnv({ path: ".env.local", override: false });
+loadDotEnv({ path: ".env", override: false });
 
 const execAsync = util.promisify(exec);
 
