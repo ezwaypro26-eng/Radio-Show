@@ -1,44 +1,58 @@
-# Test ElevenLabs on THE OG BEATZ RADIO SHOW
+# ElevenLabs Voice Test — THE OG BEATZ RADIO SHOW
 
-This test is **optional**. It does not replace Gemini or change the live app until you enable it.
+This draft integration uses the **official ElevenLabs JavaScript SDK** for a standalone MP3 voice test and an optional narrator in the direct episode pipeline. Gemini remains the original scriptwriter and the default speech provider. This is **not deployed**.
 
-## 1. Authorize ElevenLabs
+## 1. Onboard once (already completed on the user's Mac)
 
-From a terminal in this Radio-Show project folder:
-
-```bash
-npx -y @elevenlabs/cli@latest onboard init
-```
-
-Follow the printed instructions. The official CLI opens a browser to authorize your ElevenLabs account and saves `ELEVENLABS_API_KEY` into `.env.local`. **Do not paste your API key into GitHub or ChatGPT.**
-
-If the CLI cannot reach npm, fix your local network/DNS and try again. The credential is not created until onboarding succeeds.
-
-## 2. Make one short voice clip
+Within the Radio Show project directory:
 
 ```bash
-npm install
-node scripts/elevenlabs-radio-test.mjs
+npx -y @elevenlabs/cli@latest onboard check --answered --env-path .env.local
 ```
 
-The test makes exactly one ElevenLabs text-to-speech API request (which uses account credits) and saves `output/elevenlabs-radio-test.mp3`. Play it to judge the voice quality.
+An approved key must already exist in `.env.local`. Keep it there. Do **not** open, print, cat, copy to GitHub, or share that file. The server loads it using `dotenv` into `process.env`; only the server creates `ElevenLabsClient`.
 
-The initial voice is ElevenLabs' example voice **George**, not OG BEATZ's real voice. To change it, set `ELEVENLABS_VOICE_ID` in `.env.local` to an eligible voice ID from your ElevenLabs account.
+## 2. Bring this feature branch into your Mac project safely
 
-## 3. Optional: use it in the app
+If using a git checkout, ensure `git status --short` is empty first, so that you do not overwrite uncommitted changes. Then run:
 
-Add these settings to your server's environment (keeping the real key secret):
+```bash
+git fetch origin feature/elevenlabs-radio-test
+git switch --track origin/feature/elevenlabs-radio-test
+npm install @elevenlabs/elevenlabs-js
+```
+
+If a tracking branch already exists, use `git switch feature/elevenlabs-radio-test` instead. **Never delete or overwrite `.env.local`.** The npm install updates `package-lock.json` for the SDK.
+
+## 3. Verify and make one voice clip
+
+```bash
+npx -y @elevenlabs/cli@latest onboard check --answered --env-path .env.local
+npm run test:elevenlabs
+```
+
+This produces `output/elevenlabs-radio-test.mp3` and uses credits for **one** text-to-speech call. It uses ElevenLabs' sample voice George, not a clone of OG BEATZ.
+
+## 4. Optional: use ElevenLabs for complete direct episodes
+
+In your private local `.env.local` (use an editor, not a chat message), set:
 
 ```
 RADIO_TTS_PROVIDER=elevenlabs
-ELEVENLABS_API_KEY=the-key-created-by-onboarding
-ELEVENLABS_VOICE_ID=your-authorized-voice-id
+ELEVENLABS_VOICE_ID=JBFqnCBsd6RMkjVDRZzb
+ELEVENLABS_TTS_MODEL=eleven_multilingual_v2
 ```
 
-Restart `npm run dev`, then generate a **3-minute** show. Gemini still writes the episode script; only narration switches to ElevenLabs. The app keeps the original Gemini TTS when `RADIO_TTS_PROVIDER` is unset or `gemini`.
+Then restart the server and generate a short test episode in the app. Gemini writes the script, ElevenLabs voices it. `RADIO_TTS_PROVIDER=gemini` switches the voice pipeline back without code changes. The default is still Gemini unless explicitly changed.
 
-Switching back is instant: set `RADIO_TTS_PROVIDER=gemini` and restart. The existing quotas and backend controls are unchanged. This test does not include music or a second host.
+Voice chunks use `pcm_24000`, 24 kHz mono 16-bit, matching the existing direct-episode mixer. Generation uses ElevenLabs credits for each narration chunk. No music or two-host feature is included in this first test.
 
-**Security:** Never place your API key in `VITE_` variables or client-side code. `.env.local` is ignored by git. For deployment, set it as a private server-side environment variable.
+## Limits and readiness
 
-References: https://elevenlabs.io/docs/eleven-api/quickstart and https://elevenlabs.io/docs/api-reference/text-to-speech/convert
+- Draft only, not merged or deployed
+- Not yet installed or runtime-tested on the user's Mac by the assistant
+- Requires the approved `.env.local` key on the computer that runs the server
+- The existing `package-lock.json` must be refreshed by running `npm install @elevenlabs/elevenlabs-js` in the local project before a production deployment or `npm ci`
+- Do not expose `ELEVENLABS_API_KEY` via a `VITE_` variable or browser code
+
+Official docs: https://elevenlabs.io/docs/eleven-api/quickstart
