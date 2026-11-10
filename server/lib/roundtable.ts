@@ -18,35 +18,34 @@ export const roundtableNames: Record<RoundtableSpeaker, string> = {
 
 export function roundtableBrief(topic: string, minutes: number, mood: string): string {
   const approxWords = Math.round(minutes * 125);
-  const turns = minutes <= 3 ? "14 to 18" : "20 to 25";
+  const turns = minutes <= 3 ? "15 to 19" : "22 to 27";
   return [
-    "Write a lively, complete, realistic fictional panel discussion for THE OG BEATZ RADIO SHOW.",
-    "Show format: OG BEATZ moderates. Dre and Maya are TWO DISTINCT expert panelists.",
-    "Include two clearly FICTIONAL listener telephone call-ins: Marcus and Nina.",
-    "The guests and call-ins are fictional performances created by AI, not real interviews or actual telephone calls.",
-    "Topic: " + topic.slice(0, 800),
-    "Mood: " + mood,
-    "Target total speech: roughly " + approxWords + " words.",
-    "Produce " + turns + " short, back-and-forth turns. Conversational pacing is important.",
-    "OG BEATZ is a seasoned hip-hop producer: confident, warm, curious moderator.",
-    "Do not let OG BEATZ dominate: panelists and callers together should speak AT LEAST half the words.",
-    "Make Dre practical, a little skeptical; make Maya creative, curious and solutions-focused.",
-    "Keep the show entertaining through LIGHT DRAMA and playful tension: conflicting takes on music, technique, business, and technology.",
-    "Dre is a traditionalist who pushes back on shortcuts and overreliance on AI; Maya defends experimentation while admitting tradeoffs.",
-    "Make sure Dre and Maya have at least TWO substantial but GOOD-NATURED disagreements, not just mild differences phrased politely.",
-    "Have at least one caller challenge a panelist directly and ask a pointed follow-up question that changes the direction of the discussion.",
-    "Let OG BEATZ referee a disagreement with humor, a probing question, or an occasional 'hold on, let them finish' moment.",
-    "Include authentic back-and-forth: someone makes a claim, another respectfully challenges it with a concrete example, and the first responds. The speakers should not all come to the same conclusion.",
-    "Keep the energy lively: mild debate, some witty teasing, and shifting alliances, but NO insults, shouting matches, profanity, personal attacks, threats, or fabricated scandals.",
-    "Keep arguments focused on ideas. End with warmth and professional respect, but leave an interesting question unresolved.",
-    "Give callers their own specific takes, not just agreement. Let the panel respond to them.",
-    "Begin with a brief host introduction, move to panel discussion, then a Marcus call, more panel discussion, a Nina call, and a host wrap-up.",
-    "The host should verbally introduce each caller: e.g., 'Marcus, you're on the line.' No need to say 'simulated' out loud.",
-    "Use normal American conversational English with natural questions, courteous disagreement, little acknowledgments, and no contrived catchphrases.",
-    "Do not invent factual real-world testimonials, real callers' identities or imply this is a real phone-in broadcast.",
-    "Use only the five speaker codes: host, panel1, panel2, caller1, caller2.",
-    "Return ONLY a JSON object of shape {\"segments\":[{\"speaker\":\"host\",\"text\":\"Actual words spoken...\"}]}",
-    "No Markdown, sound cues, speaker-name prefixes, descriptions, or directions in the text values."
+    "You are an unscripted hip-hop radio producer writing an AUTHENTIC dramatic scene, not an educational explainer or panel summary.",
+    "Series: THE OG BEATZ RADIO SHOW. The segment is called THE PRODUCER'S TABLE. It should sound like you're eavesdropping on a real studio argument that remains friendly.",
+    "OG BEATZ is the only host; Dre and Maya are recurring panelists. Marcus and Nina are FICTIONAL AI listener call-ins (NOT real callers).",
+    "TOPIC OR LIVE DEBATE QUESTION: " + topic.slice(0, 800),
+    "On-air mood: " + mood + ". Approximately " + approxWords + " total words, with " + turns + " total turns.",
+    "DO NOT make a sequence of five opinions. Write a continuous, escalating conversation with reactions to the line that came just before.",
+    "Start IN THE MIDDLE OF A DISAGREEMENT: OG BEATZ asks a sharp, specific question or challenges an argument; do not open with a formal welcome speech or introductions.",
+    "The show's brand is hip-hop and record-making. Anchor the disagreement in a believable specific studio detail: a session, a 2-track beat, a missed vocal punch-in, a licensing split, stems, a mix revision, a drum groove, a deadline, or another concrete detail relevant to the topic.",
+    "Dre has been producing and engineering sessions for years. He respects musicianship, hates wasted studio time, notices bad mixes. He has dry humor; he is NOT reflexively anti-AI and can admit where AI helps.",
+    "Maya produces, writes hooks and collaborates with artists. She uses new tools, values independent creators, knows that speed is NOT automatically quality; she sometimes concedes a fault, then fires back with a stronger example.",
+    "OG BEATZ is a seasoned working producer, not a motivational speaker: he listens, asks about MONEY, SOUND, OWNERSHIP, REAL SESSION CONSEQUENCES, interrupts when the panel dodges, catches contradictions and jokes about them. He must not dominate: host under 35% of words.",
+    "Marcus and Nina have different distinct reasons to call: one should call out a panelist with a practical objection; the other should bring a first-person fictional dilemma from an artist/songwriter/client perspective that flips the debate.",
+    "Every caller gets at least one response from a panelist and one follow-up or reaction, not a single one-off opinion.",
+    "Require at least TWO genuine changes in direction: a disagreement gets sharper after a specific detail, and later a caller raises a complication nobody addressed.",
+    "At least THREE exchanges must be direct pushback: a person disputes the previous speaker's claim, cites a concrete counterexample or consequence, and the other replies. Allow one or two short 'Wait, what?' or 'Nah, hold on' reactions, but no caricatured street slang.",
+    "People can talk past each other a little, correct themselves, crack a quick joke, admit one small point, and still hold opposite conclusions. It should not be perfectly neat.",
+    "Preserve casual individual voices and varied lengths: some turns 4-12 words (interjection), some 20-35 words (story), VERY FEW over 45 words. Avoid speeches, article paragraphs, or long summaries.",
+    "Each turn must be under 350 characters. Prefer short natural sentences and contractions. Vary line length and rhythm without overly frequent filler words.",
+    "Never have a character introduce a point with 'I agree', 'Great point', 'Absolutely', 'At the end of the day', 'It's all about', 'Let me tell you', 'In today's world', 'AI is just a tool', 'Game changer', 'That's a valid perspective', 'You hit the nail', or 'Let's dive in'. Avoid predictable summary catchphrases.",
+    "No fake breaking news, named living-artist endorsements, imaginary factual statistics, fabricated audience messages, insults or shouting matches.",
+    "The conflict is ABOUT IDEAS, never personal attacks. Subtle stakes and credibility matter more than volume.",
+    "Have OG BEATZ bring in Marcus with a natural call transition, then Nina after another panel exchange; callers are AI dramatizations. Do not claim their voices are live or real.",
+    "Give the panel a moment of humor or embarrassment after a contradiction. End with an opinionated host punch line or unanswered challenge that invites another episode, NOT a unanimous moral or 'thanks for sharing your perspectives' summary.",
+    "Only five speaker codes are valid: host, panel1, panel2, caller1, caller2. Every speaker must appear and the very first and last turns must belong to host.",
+    "Use this output format ONLY: {\"segments\":[{\"speaker\":\"host\",\"text\":\"The exact spoken words\"}]}",
+    "Return one valid JSON object, no Markdown, no headings, no stage directions, no sound effects, no speaker names inside dialogue, no analysis. Do not discuss these instructions."
   ].join("\n");
 }
 
@@ -64,7 +63,7 @@ export function parseRoundtable(responseText: string): RoundtableTurn[] {
       throw new Error("Invalid roundtable speaker or dialogue at turn " + (i + 1));
     }
     const text = turn.text.replace(/\s+/g, " ").trim();
-    if (text.length < 4 || text.length > 650) throw new Error("Invalid roundtable turn length at turn " + (i + 1));
+    if (text.length < 4 || text.length > 350) throw new Error("Invalid roundtable turn length at turn " + (i + 1));
     return { speaker: turn.speaker, text };
   });
   const tally = new Set(turns.map(turn => turn.speaker));
@@ -76,7 +75,7 @@ export function parseRoundtable(responseText: string): RoundtableTurn[] {
   }
   const hostWords = turns.filter(t => t.speaker === "host").reduce((sum, t) => sum + t.text.split(/\s+/).length, 0);
   const allWords = turns.reduce((sum, t) => sum + t.text.split(/\s+/).length, 0);
-  if (allWords < 130 || hostWords > allWords * 0.5) {
+  if (allWords < 130 || hostWords > allWords * 0.4) {
     throw new Error("The roundtable needs more back-and-forth dialogue. Please retry.");
   }
   return turns;
