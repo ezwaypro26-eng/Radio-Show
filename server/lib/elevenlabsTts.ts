@@ -5,7 +5,12 @@
  */
 import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 
-export async function elevenLabsPcmChunk(text: string, signal: AbortSignal, selectedVoiceId?: string): Promise<Buffer> {
+export async function elevenLabsPcmChunk(
+  text: string,
+  signal: AbortSignal,
+  selectedVoiceId?: string,
+  role?: "host" | "panel1" | "panel2" | "caller1" | "caller2"
+): Promise<Buffer> {
   if (!process.env.ELEVENLABS_API_KEY) {
     throw new Error("ElevenLabs is selected but the server is missing ELEVENLABS_API_KEY. Complete CLI onboarding in this project.");
   }
@@ -21,10 +26,21 @@ export async function elevenLabsPcmChunk(text: string, signal: AbortSignal, sele
 
   try {
     const client = new ElevenLabsClient();
+    // The cloned host remains recognizable; panelists get a little more range
+    // and variation so they sound like people reacting rather than reading essays.
+    // These settings apply to this request only and do not edit saved ElevenLabs voices.
+    const speakerSettings = role ? {
+      stability: role === "host" ? 0.52 : role.startsWith("panel") ? 0.38 : 0.44,
+      similarityBoost: role === "host" ? 0.86 : 0.76,
+      style: 0,
+      useSpeakerBoost: true,
+      speed: role === "panel2" ? 1.04 : role === "caller1" ? 1.05 : role === "panel1" ? 0.98 : 1
+    } : undefined;
     const stream = await client.textToSpeech.convert(voiceId, {
       text,
       modelId,
-      outputFormat: "pcm_24000"
+      outputFormat: "pcm_24000",
+      ...(speakerSettings ? { voiceSettings: speakerSettings } : {})
     }, { abortSignal: controller.signal, timeoutInSeconds: 90, maxRetries: 0 });
 
     const reader = stream.getReader();
