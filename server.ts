@@ -546,8 +546,13 @@ async function startServer() {
     // Run background cleanup list whenever a new show is request to optimize disk space
     cleanUpOldGenerations();
 
-    const { topic, duration = "3", mood = "Informative", generationId } = req.body;
-    if (process.env.RADIO_GENERATION_MODE !== "agent") {
+    const { topic, duration = "3", mood = "Informative", format = "solo", generationId } = req.body;
+    if (format !== "solo" && format !== "roundtable") {
+      return res.status(400).json({ error: "Choose either Solo Host or Roundtable + Call-ins." });
+    }
+    // The panel is implemented in the direct-audio pipeline, even if agent mode was configured.
+    const directGeneration = format === "roundtable" || process.env.RADIO_GENERATION_MODE !== "agent";
+    if (directGeneration) {
       const requestedMinutes = Number(duration);
       if (!Number.isFinite(requestedMinutes) || requestedMinutes < 1 || requestedMinutes > 5) {
         return res.status(400).json({ error: "Choose a show duration between 1 and 5 minutes for direct audio generation." });
@@ -618,12 +623,13 @@ async function startServer() {
 
     // Use short, direct Gemini calls by default. This avoids the managed
     // agent's ten-minute 504 deadline. Restore it only with RADIO_GENERATION_MODE=agent.
-    if (process.env.RADIO_GENERATION_MODE !== "agent") {
+    if (directGeneration) {
       try {
         const episode = await generateDirectEpisode({
           topic: String(topic),
           duration: Number(duration),
           mood: String(mood),
+          format: format === "roundtable" ? "roundtable" : "solo",
           signal: abortController.signal,
           progress: message => sendEvent({ type: "info", message })
         });
