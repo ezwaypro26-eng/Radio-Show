@@ -5,13 +5,13 @@
  */
 import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 
-export async function elevenLabsPcmChunk(text: string, signal: AbortSignal): Promise<Buffer> {
+export async function elevenLabsPcmChunk(text: string, signal: AbortSignal, selectedVoiceId?: string): Promise<Buffer> {
   if (!process.env.ELEVENLABS_API_KEY) {
     throw new Error("ElevenLabs is selected but the server is missing ELEVENLABS_API_KEY. Complete CLI onboarding in this project.");
   }
   if (signal.aborted) throw new Error("Episode generation was cancelled.");
 
-  const voiceId = process.env.ELEVENLABS_VOICE_ID?.trim() || "JBFqnCBsd6RMkjVDRZzb"; // George, sample voice
+  const voiceId = selectedVoiceId?.trim() || process.env.ELEVENLABS_VOICE_ID?.trim() || "JBFqnCBsd6RMkjVDRZzb"; // George is the sample fallback
   const modelId = process.env.ELEVENLABS_TTS_MODEL?.trim() || "eleven_multilingual_v2";
 
   const controller = new AbortController();
